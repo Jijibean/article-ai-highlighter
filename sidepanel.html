@@ -11,8 +11,67 @@
     <header>
       <h1>Article AI Highlighter</h1>
     </header>
-    <main id="main-content">
-      <!-- placeholder — filled in Step 2 -->
+
+    <main>
+
+      <!-- API Key Section -->
+      <section class="section" id="api-key-section">
+        <label for="api-key">Anthropic API Key</label>
+        <div class="row">
+          <input
+            type="password"
+            id="api-key"
+            placeholder="sk-ant-..."
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button id="save-key-btn" class="btn btn-secondary">Save</button>
+        </div>
+        <p class="hint" id="key-status"></p>
+      </section>
+
+      <!-- Article Text Section -->
+      <section class="section">
+        <label for="article-text">Article Text</label>
+        <div class="row">
+          <label class="file-label" for="file-input">Load .txt file</label>
+          <input type="file" id="file-input" accept=".txt" />
+          <button id="clear-text-btn" class="btn btn-ghost">Clear</button>
+        </div>
+        <textarea
+          id="article-text"
+          rows="10"
+          placeholder="Paste article text here, or load a .txt file above…"
+        ></textarea>
+        <p class="char-count" id="char-count">0 characters</p>
+      </section>
+
+      <!-- Question Section -->
+      <section class="section">
+        <label for="question">Your Question</label>
+        <input
+          type="text"
+          id="question"
+          placeholder="e.g. What are the main conclusions?"
+        />
+      </section>
+
+      <!-- Actions -->
+      <section class="section actions">
+        <button id="submit-btn" class="btn btn-primary">Find &amp; Highlight</button>
+        <button id="clear-highlights-btn" class="btn btn-ghost">Clear Highlights</button>
+      </section>
+
+      <!-- Status / Results -->
+      <section class="section" id="results-section" hidden>
+        <div id="spinner" class="spinner" hidden></div>
+        <div id="error-box" class="error-box" hidden></div>
+        <div id="passages-box" hidden>
+          <p class="results-label">Matched passages (<span id="match-count">0</span>):</p>
+          <ol id="passages-list"></ol>
+        </div>
+      </section>
+
     </main>
   </div>
   <script src="sidepanel.js"></script>
