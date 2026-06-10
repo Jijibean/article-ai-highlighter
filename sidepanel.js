@@ -56,6 +56,10 @@ fileInput.addEventListener('change', () => {
     updateCharCount();
     fileInput.value = '';
   };
+  reader.onerror = () => {
+    alert('Failed to read the file. Make sure it is a plain .txt file.');
+    fileInput.value = '';
+  };
   reader.readAsText(file);
 });
 
@@ -146,7 +150,9 @@ ${article}
 QUESTION:
 ${question}`;
 
-  const response = await fetch(API_URL, {
+  let response;
+  try {
+    response = await fetch(API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -154,13 +160,16 @@ ${question}`;
       'anthropic-version': '2023-06-01',
       'anthropic-dangerous-direct-browser-access': 'true',
     },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }],
-    }),
-  });
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      }),
+    });
+  } catch (networkErr) {
+    throw new Error('Network error — check your internet connection and try again.');
+  }
 
   if (!response.ok) {
     let detail = `HTTP ${response.status}`;
@@ -244,6 +253,7 @@ async function highlightOnPage(passages) {
 // ── UI helpers ────────────────────────────────────────────────────────────────
 function setLoading(on) {
   submitBtn.disabled = on;
+  submitBtn.textContent = on ? 'Searching…' : 'Find & Highlight';
   clearHighlightsBtn.disabled = on;
 }
 
