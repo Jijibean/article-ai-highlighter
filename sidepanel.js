@@ -208,7 +208,37 @@ function renderPassages(passages) {
 
 // ── Send passages to content script ──────────────────────────────────────────
 async function highlightOnPage(passages) {
-  // Implemented fully in Step 4
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab) return;
+
+  // Ensure the content script is injected (handles pages opened before the
+  // extension was installed or that match no declarative content_scripts rule).
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['content.js'],
+    });
+  } catch (_) {
+    // Script already injected — that's fine.
+  }
+
+  try {
+    const response = await chrome.tabs.sendMessage(tab.id, {
+      type: 'HIGHLIGHT_PASSAGES',
+      passages,
+    });
+    if (response && response.highlighted === 0) {
+      showError(
+        'Passages were found by the AI but could not be located in the ' +
+        'page text. The article text in the panel may differ from the live page.'
+      );
+    }
+  } catch (err) {
+    showError(
+      'Could not communicate with the page. ' +
+      'Try refreshing the tab and submitting again.'
+    );
+  }
 }
 
 // ── UI helpers ────────────────────────────────────────────────────────────────
