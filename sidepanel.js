@@ -18,6 +18,9 @@ const passagesBox        = document.getElementById('passages-box');
 const matchCount         = document.getElementById('match-count');
 const passagesList       = document.getElementById('passages-list');
 
+const API_URL = 'https://api.anthropic.com/v1/messages';
+const MODEL   = 'claude-sonnet-4-20250514';
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 chrome.storage.local.get('apiKey', ({ apiKey }) => {
   if (apiKey) {
@@ -51,7 +54,7 @@ fileInput.addEventListener('change', () => {
   reader.onload = (e) => {
     articleText.value = e.target.result;
     updateCharCount();
-    fileInput.value = ''; // reset so same file can be re-loaded
+    fileInput.value = '';
   };
   reader.readAsText(file);
 });
@@ -83,12 +86,10 @@ async function sendClearHighlights() {
 submitBtn.addEventListener('click', handleSubmit);
 
 async function handleSubmit() {
-  // This function is fleshed out fully in Step 3 & 4.
-  // For now it just validates inputs.
   hideResults();
 
-  const apiKey  = apiKeyInput.value.trim();
-  const article = articleText.value.trim();
+  const apiKey   = apiKeyInput.value.trim();
+  const article  = articleText.value.trim();
   const question = questionInput.value.trim();
 
   if (!apiKey) {
@@ -104,11 +105,118 @@ async function handleSubmit() {
     return;
   }
 
-  // API call added in Step 3
-  showError('API integration coming in Step 3.');
+  setLoading(true);
+  showSpinner();
+
+  let passages;
+  try {
+    passages = await fetchPassages(apiKey, article, question);
+  } catch (err) {
+    setLoading(false);
+    showError(err.message);
+    return;
+  }
+
+  setLoading(false);
+
+  if (!passages || passages.length === 0) {
+    showError('No matching passages found. Try rephrasing your question.');
+    return;
+  }
+
+  renderPassages(passages);
+  await highlightOnPage(passages);
+}
+
+// ── Anthropic API call ────────────────────────────────────────────────────────
+async function fetchPassages(apiKey, article, question) {
+  const systemPrompt = `You are a precise text-analysis assistant.
+Your job: given an article and a question, find the verbatim passages in the article that best answer the question.
+
+Rules:
+- Return ONLY a valid JSON array of strings.
+- Each string must be an EXACT, verbatim substring of the article — do not paraphrase or alter any word.
+- Include 1–6 passages, ordered by relevance (most relevant first).
+- If nothing in the article answers the question, return an empty array: []
+- Output nothing except the JSON array. No markdown fences, no prose, no explanation.`;
+
+  const userPrompt = `ARTICLE:
+${article}
+
+QUESTION:
+${question}`;
+
+  const response = await fetch(API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
+    }),
+  });
+
+  if (!response.ok) {
+    let detail = `HTTP ${response.status}`;
+    try {
+      const body = await response.json();
+      detail = body?.error?.message || detail;
+    } catch (_) {}
+    throw new Error(`API error: ${detail}`);
+  }
+
+  const data = await response.json();
+  const raw = data?.content?.[0]?.text ?? '';
+
+  // Strip markdown code fences in case the model adds them anyway
+  const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+
+  let parsed;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch (_) {
+    throw new Error('Could not parse the model response as JSON. Try again.');
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new Error('Unexpected response format from model. Try again.');
+  }
+
+  return parsed.filter((p) => typeof p === 'string' && p.trim().length > 0);
+}
+
+// ── Render passages list ──────────────────────────────────────────────────────
+function renderPassages(passages) {
+  passagesList.innerHTML = '';
+  passages.forEach((p) => {
+    const li = document.createElement('li');
+    li.textContent = p;
+    passagesList.appendChild(li);
+  });
+  matchCount.textContent = passages.length;
+  show(passagesBox);
+  show(resultsSection);
+  hide(spinner);
+  hide(errorBox);
+}
+
+// ── Send passages to content script ──────────────────────────────────────────
+async function highlightOnPage(passages) {
+  // Implemented fully in Step 4
 }
 
 // ── UI helpers ────────────────────────────────────────────────────────────────
+function setLoading(on) {
+  submitBtn.disabled = on;
+  clearHighlightsBtn.disabled = on;
+}
+
 function showError(msg) {
   errorBox.textContent = msg;
   show(errorBox);
